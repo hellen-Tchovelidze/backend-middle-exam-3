@@ -16,11 +16,11 @@ import { QueryParamsDto } from './dto/query-params.dto';
 
 @Injectable()
 export class UsersService implements OnModuleInit {
-  constructor(@InjectModel('user') private readonly usersModule: Model<User>) {}
+  constructor(@InjectModel(User.name) private userModel: Model<User>) {}
   async onModuleInit() {
-    const count = await this.usersModule.countDocuments();
+    const count = await this.userModel.countDocuments();
 
-    await this.usersModule.updateMany(
+    await this.userModel.updateMany(
       { isguarantee: { $exists: false } },
       {
         $set: {
@@ -31,14 +31,14 @@ export class UsersService implements OnModuleInit {
 
     if (count === 0) {
       const dataToInsert: any = [];
-      for (let i = 0; i < 200; i++) {
+      for (let i = 0; i < 300_000; i++) {
         dataToInsert.push({
           name: faker.person.firstName(),
           age: faker.number.int({ min: 11, max: 80 }),
           gender: faker.helpers.arrayElement(['m', 'f']),
         });
       }
-      await this.usersModule.insertMany(dataToInsert);
+      await this.userModel.insertMany(dataToInsert);
       console.log(dataToInsert.slice(0, 5));
     }
   }
@@ -49,21 +49,26 @@ export class UsersService implements OnModuleInit {
 
   async findAll({ name, ageFrom, ageTo, page, take, gender }: QueryParamsDto) {
     const filter: any = {};
+    
+
     if (name) {
-      filter.name = { $regex: name, $options: 'i' };
+      filter.name = { $regex: name, $options: 'i' };  
     }
-    if (ageFrom) {
-      filter.price = { ...filter.age, $gte: ageFrom };
-    }
-    if (ageTo) {
-      filter.price = { ...filter.age, $lte: ageTo };
-    }
-
+  
     if (gender) {
-      filter.gender = {$regex: name, $options: 'i'}
+      filter.gender = { $regex: gender, $options: 'i' }; 
     }
-
-    const users = await this.usersModule
+  
+    if (ageFrom !== undefined || ageTo !== undefined) {
+      filter.age = {};
+      if (ageFrom !== undefined) filter.age.$gte = ageFrom;
+      if (ageTo !== undefined) filter.age.$lte = ageTo;
+  
+      if (Object.keys(filter.age).length === 0) {
+        delete filter.age;
+      }
+    }
+    const users = await this.userModel
       .find(filter)
       .skip((page - 1) * take)
       .limit(take);
@@ -71,8 +76,8 @@ export class UsersService implements OnModuleInit {
     return users;
   }
 
-  async findOne(id: number) {
-    const user = await this.usersModule.findById(id);
+  async findOne(id: string) {
+    const user = await this.userModel.findById(id);
     if (!user) {
       throw new NotFoundException('not found user by this Id ');
     }
@@ -80,12 +85,15 @@ export class UsersService implements OnModuleInit {
   }
 
 
-  async getTotalUsers(): Promise<number> {
-    return this.usersModule.countDocuments();
+  async getTotalUsers(){
+    console.log("shemovida")
+    const users = await this.userModel.countDocuments();
+    console.log(users)
+    return users
   }
 
-  async update(id: number, updateUserDto: UpdateUserDto) {
-    const updatedUser = await this.usersModule.findByIdAndUpdate(
+  async update(id: string, updateUserDto: UpdateUserDto) {
+    const updatedUser = await this.userModel.findByIdAndUpdate(
       id,
       updateUserDto,
       { new: true },
@@ -96,8 +104,8 @@ export class UsersService implements OnModuleInit {
     return updatedUser;
   }
 
-  async remove(id: number) {
-    const deletedUser = await this.usersModule.findByIdAndDelete(id);
+  async remove(id: string) {
+    const deletedUser = await this.userModel.findByIdAndDelete(id);
     if (!deletedUser) {
       throw new BadRequestException('not del');
     }
